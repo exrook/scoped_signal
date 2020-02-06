@@ -20,7 +20,6 @@ extern "C" fn c_handler(signo: c_int, info: *mut SigInfo, _: *mut c_void) {
     // I hope the `with` method is async-signal-safe
     SIGNAL_HANDLERS.with(|handlers| {
         if let Some(h) = handlers[signo as usize].get() {
-            println!("pointer to closure {:p}", h);
             if let Some(info) = unsafe { info.as_ref() } {
                 h(signo as u8, info)
             }

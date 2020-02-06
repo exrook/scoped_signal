@@ -1,12 +1,13 @@
 [package]
 name = "scoped_signal"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Jacob Hughes <j@jacobhughes.me>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
 description = "Provides a scoped interface to signal handlers that are only active for the lifetime of a given closure"
 repository = "https://github.com/exrook/scoped_signal"
 homepage = "https://github.com/exrook/scoped_signal"
+documentation = "https://docs.rs/scoped_signal/"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
