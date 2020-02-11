@@ -70,7 +70,6 @@ pub struct SignalScope<F> {
     signal: Signal,
     flags: SaFlags,
     set: SigSet,
-    after: Option<SigAction>
 }
 
 impl<Handler: Fn(u8, &SigInfo)> SignalScope<Handler> {
@@ -91,7 +90,6 @@ impl<Handler: Fn(u8, &SigInfo)> SignalScope<Handler> {
             signal,
             flags,
             set,
-            after: None
         }
     }
 
