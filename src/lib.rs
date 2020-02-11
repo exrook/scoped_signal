@@ -6,15 +6,15 @@ use std::marker::PhantomData;
 use std::mem;
 use std::sync::atomic::{compiler_fence, Ordering};
 
-use array_macro::array;
+use arr_macro::arr;
 
 pub use libc::siginfo_t as SigInfo;
 use libc::{c_int, c_void};
 use nix::sys::signal;
-pub use nix::sys::signal::{SaFlags, SigSet, Signal};
+pub use nix::sys::signal::{SaFlags, SigSet, Signal, SigAction, SigHandler};
 pub use nix::Error;
 
-thread_local!(static SIGNAL_HANDLERS: [Cell<Option<&'static dyn Fn(u8, &SigInfo)>>; 64] = array![Cell::from(None); 64]);
+thread_local!(static SIGNAL_HANDLERS: [Cell<Option<&'static dyn Fn(u8, &SigInfo)>>; 64] = arr![Cell::from(None); 64]);
 
 extern "C" fn c_handler(signo: c_int, info: *mut SigInfo, _: *mut c_void) {
     // I hope the `with` method is async-signal-safe
@@ -70,10 +70,14 @@ pub struct SignalScope<F> {
     signal: Signal,
     flags: SaFlags,
     set: SigSet,
+    after: Option<SigAction>
 }
 
 impl<Handler: Fn(u8, &SigInfo)> SignalScope<Handler> {
     /// Create an object representing the provided signal handler.
+    /// The handler is only called in the thread that run() is called from.
+    /// If another thread receives the same signal, the signal will be ignored unless the thread
+    /// is using its own SignalScope for the same signal
     ///
     /// `set` defines what signals are blocked during the execution of the signal handler itself
     ///
@@ -87,16 +91,18 @@ impl<Handler: Fn(u8, &SigInfo)> SignalScope<Handler> {
             signal,
             flags,
             set,
+            after: None
         }
     }
+
     /// Run the given closure with this signal handler installed
     pub fn run<T, F: FnOnce() -> T>(self, f: F) -> Result<T, Error> {
-        let action = signal::SigHandler::SigAction(c_handler);
-        let sa = signal::SigAction::new(action, self.flags, self.set);
+        let action = SigHandler::SigAction(c_handler);
+        let sa = SigAction::new(action, self.flags, self.set);
 
         // load our handler
         let guard = HandlerGuard::install(self.signal, &self.handler);
-        let old_handler = unsafe { signal::sigaction(self.signal, &sa)? };
+        let _old_handler = unsafe { signal::sigaction(self.signal, &sa)? };
 
         compiler_fence(Ordering::SeqCst);
         let ret = Ok(f());
@@ -105,8 +111,7 @@ impl<Handler: Fn(u8, &SigInfo)> SignalScope<Handler> {
         // uninstall the handler fn from TLS
         drop(guard);
 
-        // reinstall the previous signal handler
-        unsafe { signal::sigaction(self.signal as Signal, &old_handler)? };
+        // we no longer reinstall the old handler
 
         ret
     }
